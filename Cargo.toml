@@ -9,7 +9,6 @@ description = "Instruction and CSR utils for riscv simulator"
 [dependencies]
 terminus-macros={ path = "macros" }
 terminus-proc-macros={ path = "proc_macros" }
-linkme = "0.1"
 
 [workspace]
 members = ["macros","proc_macros"]
