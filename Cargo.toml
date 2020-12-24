@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["shady831213 <shady831213@126.com>"]
 edition = "2018"
 license = "MIT"
-description = "Instruction and CSR utils for riscv simulator"
+description = "Instruction and CSR utils for ISA"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 terminus-macros={ path = "macros" }
