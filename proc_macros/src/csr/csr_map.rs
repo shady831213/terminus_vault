@@ -180,6 +180,8 @@ impl<'a> Maps<'a> {
                 quote! {
                     if self.#name().set_forbidden {
                         None
+                    } else if self.#name().set_ignore {
+                        Some(())
                     } else {
                         Some(self.#mut_name().set(value))
                     }
@@ -197,10 +199,13 @@ impl<'a> Maps<'a> {
             let block = if csr_map.privilege.readable() {
                 quote! {
                    if self.#name().get_forbidden {
-                        None
-                    } else {
-                        Some(self.#name().get())}
-                    }
+                       None
+                   } else if self.#name().get_ignore {
+                       Some(0)
+                   } else {
+                       Some(self.#name().get())
+                   }
+                }
             } else {
                 quote! {Some(0)}
             };

@@ -402,15 +402,6 @@ impl<'a> FieldSet<'a> {
                 }
             }
         });
-        let forbidden_fns = quote! {
-            pub fn get_forbidden(&mut self, forbidden:bool) {
-                self.get_forbidden = forbidden
-            }
-            pub fn set_forbidden(&mut self, forbidden:bool) {
-                self.set_forbidden = forbidden
-            }
-        };
-
         let fns = quote_map_fold(self.field_names.values(), |field| {
             let (setter, getter) = (field.setter_name(), field.getter_name());
             let (setter_with_trans, getter_with_trans) = (format_ident!("{}_with_trans", field.setter_name()), format_ident!("{}_with_trans",field.getter_name()));
@@ -439,6 +430,8 @@ impl<'a> FieldSet<'a> {
                 transforms:#transforms_name,
                 get_forbidden:bool,
                 set_forbidden:bool,
+                get_ignore:bool,
+                set_ignore:bool,
             }
 
             impl #top_name {
@@ -449,10 +442,23 @@ impl<'a> FieldSet<'a> {
                         transforms:#transforms_name::new(),
                         get_forbidden:false,
                         set_forbidden:false,
+                        get_ignore:false,
+                        set_ignore:false,
                     }
                 }
                 #transform_fns
-                #forbidden_fns
+                pub fn get_forbidden(&mut self, forbidden:bool) {
+                    self.get_forbidden = forbidden
+                }
+                pub fn set_forbidden(&mut self, forbidden:bool) {
+                    self.set_forbidden = forbidden
+                }
+                pub fn get_ignore(&mut self, ignore:bool) {
+                    self.get_ignore = ignore
+                }
+                pub fn set_ignore(&mut self, ignore:bool) {
+                    self.set_ignore = ignore
+                }
                 pub fn get(&self) -> u64 {
                     match self.xlen {
                         64 => unsafe { self.csr.x64.get(&self.transforms) },
