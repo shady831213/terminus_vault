@@ -402,6 +402,14 @@ impl<'a> FieldSet<'a> {
                 }
             }
         });
+        let forbidden_fns = quote! {
+            pub fn get_forbidden(&mut self, forbidden:bool) {
+                self.get_forbidden = forbidden
+            }
+            pub fn set_forbidden(&mut self, forbidden:bool) {
+                self.set_forbidden = forbidden
+            }
+        };
 
         let fns = quote_map_fold(self.field_names.values(), |field| {
             let (setter, getter) = (field.setter_name(), field.getter_name());
@@ -428,7 +436,9 @@ impl<'a> FieldSet<'a> {
             pub struct #top_name {
                 pub xlen:usize,
                 csr:#union_name,
-                transforms:#transforms_name
+                transforms:#transforms_name,
+                get_forbidden:bool,
+                set_forbidden:bool,
             }
 
             impl #top_name {
@@ -436,10 +446,13 @@ impl<'a> FieldSet<'a> {
                     #top_name{
                         xlen,
                         csr:#union_name{x64:{#struct64_name(init)}},
-                        transforms:#transforms_name::new()
+                        transforms:#transforms_name::new(),
+                        get_forbidden:false,
+                        set_forbidden:false,
                     }
                 }
                 #transform_fns
+                #forbidden_fns
                 pub fn get(&self) -> u64 {
                     match self.xlen {
                         64 => unsafe { self.csr.x64.get(&self.transforms) },

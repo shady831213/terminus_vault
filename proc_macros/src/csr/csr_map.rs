@@ -177,7 +177,13 @@ impl<'a> Maps<'a> {
             let addr = &csr_map.addr;
             let mut_name = format_ident!("{}_mut", name);
             let block = if csr_map.privilege.writeable() {
-                quote! {Some(self.#mut_name().set(value))}
+                quote! {
+                    if self.#name().set_forbidden {
+                        None
+                    } else {
+                        Some(self.#mut_name().set(value))
+                    }
+                }
             } else {
                 quote! {Some(())}
             };
@@ -189,7 +195,12 @@ impl<'a> Maps<'a> {
             let name = &csr_map.name;
             let addr = &csr_map.addr;
             let block = if csr_map.privilege.readable() {
-                quote! {Some(self.#name().get())}
+                quote! {
+                   if self.#name().get_forbidden {
+                        None
+                    } else {
+                        Some(self.#name().get())}
+                    }
             } else {
                 quote! {Some(0)}
             };
