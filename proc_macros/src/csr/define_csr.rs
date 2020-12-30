@@ -459,6 +459,18 @@ impl<'a> FieldSet<'a> {
                 pub fn set_ignore(&mut self, ignore:bool) {
                     self.set_ignore = ignore
                 }
+                pub fn is_get_forbidden(&self) -> bool {
+                    self.get_forbidden
+                }
+                pub fn is_set_forbidden(&self) -> bool {
+                    self.set_forbidden
+                }
+                pub fn is_get_ignore(&self) -> bool {
+                    self.get_ignore
+                }
+                pub fn is_set_ignore(&self) -> bool {
+                    self.set_ignore
+                }
                 pub fn get(&self) -> u64 {
                     match self.xlen {
                         64 => unsafe { self.csr.x64.get(&self.transforms) },

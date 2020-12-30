@@ -178,9 +178,9 @@ impl<'a> Maps<'a> {
             let mut_name = format_ident!("{}_mut", name);
             let block = if csr_map.privilege.writeable() {
                 quote! {
-                    if self.#name().set_forbidden {
+                    if self.#name().is_set_forbidden() {
                         None
-                    } else if self.#name().set_ignore {
+                    } else if self.#name().is_set_ignore() {
                         Some(())
                     } else {
                         Some(self.#mut_name().set(value))
@@ -198,9 +198,9 @@ impl<'a> Maps<'a> {
             let addr = &csr_map.addr;
             let block = if csr_map.privilege.readable() {
                 quote! {
-                   if self.#name().get_forbidden {
+                   if self.#name().is_get_forbidden() {
                        None
-                   } else if self.#name().get_ignore {
+                   } else if self.#name().is_get_ignore() {
                        Some(0)
                    } else {
                        Some(self.#name().get())
