@@ -38,7 +38,7 @@ use syn::DeriveInput;
 /// #[code("8b1??0_1111")]
 /// #[derive(Debug)]
 /// struct InsnCodingTestStruct2();
-/// 
+///
 /// impl Execution for InsnCodingTestStruct2 {
 ///     fn execute(&self, p: &mut Processor)->Result<(), Exception> {
 ///         Ok(())
@@ -61,7 +61,7 @@ pub fn instruction(input: TokenStream) -> TokenStream {
     let name = &ast.ident;
     match insn::expand(&ast, name) {
         Ok(s) => s.into(),
-        Err(e) => e.to_compile_error().into()
+        Err(e) => e.to_compile_error().into(),
     }
 }
 
@@ -349,5 +349,3 @@ pub fn define_csr(input: TokenStream) -> TokenStream {
 pub fn csr_map(input: TokenStream) -> TokenStream {
     csr::csr_map::expand(parse_macro_input!(input)).into()
 }
-
-

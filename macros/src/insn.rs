@@ -57,8 +57,8 @@ macro_rules! insn_format {
             fn imm_len(&self)-> usize {
                 12
             }
-            
-            
+
+
         }
     };
     ($name:ident, B) => {
@@ -94,8 +94,8 @@ macro_rules! insn_format {
              fn imm_len(&self)-> usize {
                 32
              }
-             
-             
+
+
         }
     };
     ($name:ident, J) => {
@@ -113,8 +113,8 @@ macro_rules! insn_format {
              fn imm_len(&self)-> usize {
                 21
              }
-            
-            
+
+
         }
     };
     //compress format
@@ -168,8 +168,8 @@ macro_rules! insn_format {
              fn imm_len(&self)-> usize {
                 6
              }
-             
-             
+
+
         }
     };
     ($name:ident, CSS) => {

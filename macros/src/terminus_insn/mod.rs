@@ -1,7 +1,8 @@
 mod init_decoder;
 mod init_instruction;
-mod init_treemap;
 mod init_simplemap;
+mod init_treemap;
+
 #[macro_export]
 macro_rules! terminus_insn {
     ($inst:ty, $processor:ident, $exception:ident) => {

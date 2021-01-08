@@ -26,7 +26,6 @@ macro_rules! init_instruction {
             fn execute(&self, p: &mut $processor) -> Result<(), $exception>;
         }
 
-
         pub trait InstructionImp: Format + Execution + Send + Sync {}
 
         pub struct Instruction(Box<dyn InstructionImp>);

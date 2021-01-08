@@ -1,8 +1,8 @@
-use syn::{parenthesized, braced, Ident, Token, LitInt, Path, Visibility};
-use syn::parse::{Parse, ParseStream, Result, Error, ParseBuffer};
-use syn::punctuated::Punctuated;
-use proc_macro2::TokenStream;
 use super::*;
+use proc_macro2::TokenStream;
+use syn::parse::{Error, Parse, ParseBuffer, ParseStream, Result};
+use syn::punctuated::Punctuated;
+use syn::{braced, parenthesized, Ident, LitInt, Path, Token, Visibility};
 
 #[derive(Debug)]
 struct CsrMaps {
@@ -12,7 +12,6 @@ struct CsrMaps {
     high: LitInt,
     csrs: Punctuated<CsrMap, Token![;]>,
 }
-
 
 impl Parse for CsrMaps {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -24,7 +23,14 @@ impl Parse for CsrMaps {
         range.parse::<Token![,]>()?;
         let high: LitInt = range.parse()?;
         if low.base10_parse::<usize>()? > high.base10_parse::<usize>()? {
-            return Err(Error::new(range.span(), format!("low {} is bigger than high {} !", low.to_string(), high.to_string())));
+            return Err(Error::new(
+                range.span(),
+                format!(
+                    "low {} is bigger than high {} !",
+                    low.to_string(),
+                    high.to_string()
+                ),
+            ));
         }
         let csrs: ParseBuffer;
         braced!(csrs in input);
@@ -104,14 +110,34 @@ impl<'a> Maps<'a> {
 
     fn add(&mut self, csr_map: &'a CsrMap) -> Result<()> {
         if self.out_of_range(csr_map) {
-            Err(Error::new(csr_map.addr.span(), format!("addr of {}(0x{:x}) is out of range(0x{:x}, 0x{:x})!", csr_map.name.to_string(), csr_map.addr_value(), self.low, self.high)))
+            Err(Error::new(
+                csr_map.addr.span(),
+                format!(
+                    "addr of {}(0x{:x}) is out of range(0x{:x}, 0x{:x})!",
+                    csr_map.name.to_string(),
+                    csr_map.addr_value(),
+                    self.low,
+                    self.high
+                ),
+            ))
         } else {
             for prev in self.maps.iter() {
                 if csr_map.same_name(prev) {
-                    return Err(Error::new(csr_map.name.span(), format!("map name {} is redefined!", csr_map.name.to_string())));
+                    return Err(Error::new(
+                        csr_map.name.span(),
+                        format!("map name {} is redefined!", csr_map.name.to_string()),
+                    ));
                 }
                 if csr_map.same_addr(prev) {
-                    return Err(Error::new(csr_map.addr.span(), format!("addr of {}(0x{:x}) is overlapped with {}!", csr_map.name.to_string(), csr_map.addr_value(), prev.name.to_string())));
+                    return Err(Error::new(
+                        csr_map.addr.span(),
+                        format!(
+                            "addr of {}(0x{:x}) is overlapped with {}!",
+                            csr_map.name.to_string(),
+                            csr_map.addr_value(),
+                            prev.name.to_string()
+                        ),
+                    ));
                 }
             }
             Ok(self.maps.push(csr_map))
@@ -212,7 +238,7 @@ impl<'a> Maps<'a> {
             quote! { #addr => #block,}
         });
         let struct_name = if locked {
-            format_ident!("Locked{}",name)
+            format_ident!("Locked{}", name)
         } else {
             name.clone()
         };
@@ -252,15 +278,17 @@ impl<'a> Maps<'a> {
     }
 }
 
-
 pub fn expand(input: TokenStream) -> TokenStream {
     let maps: CsrMaps = expand_call!(syn::parse2(input));
-    let mut csr_maps = Maps::new(maps.low.base10_parse().unwrap(), maps.high.base10_parse().unwrap());
+    let mut csr_maps = Maps::new(
+        maps.low.base10_parse().unwrap(),
+        maps.high.base10_parse().unwrap(),
+    );
     for csr_map in maps.csrs.iter() {
         expand_call!(csr_maps.add(csr_map));
-    };
-    let unlocked =  csr_maps.expand(&maps.name, &maps.vis,false);
-    let locked = csr_maps.expand(&maps.name, &maps.vis,true);
+    }
+    let unlocked = csr_maps.expand(&maps.name, &maps.vis, false);
+    let locked = csr_maps.expand(&maps.name, &maps.vis, true);
     quote! {
         #unlocked
         #locked

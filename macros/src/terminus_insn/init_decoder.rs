@@ -14,7 +14,7 @@ macro_rules! init_decoder {
             }
         }
 
-        pub trait Decoder:Send+Sync {
+        pub trait Decoder: Send + Sync {
             fn code(&self) -> $inst;
             fn mask(&self) -> $inst;
             fn matched(&self, ir: &$inst) -> bool;
@@ -29,7 +29,7 @@ macro_rules! init_decoder {
         }
 
         lazy_static! {
-            pub static ref GDECODER:GlobalInsnMap = {
+            pub static ref GDECODER: GlobalInsnMap = {
                 let mut map = GlobalInsnMap::new();
                 for r in REGISTERY_INSN {
                     r(&mut map)

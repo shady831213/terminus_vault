@@ -1,5 +1,5 @@
-use syn::parse::{Parse, ParseStream, Result, Error};
 use proc_macro2::TokenStream;
+use syn::parse::{Error, Parse, ParseStream, Result};
 
 macro_rules! expand_call {
     ($exp:expr) => {
@@ -10,16 +10,24 @@ macro_rules! expand_call {
     };
 }
 
-fn map_fold<T, O, I: Iterator<Item=T>, MF: Fn(T) -> O, FF: Fn(O, O) -> O>(iter: I, m: MF, init: O, f: FF) -> O {
+fn map_fold<T, O, I: Iterator<Item = T>, MF: Fn(T) -> O, FF: Fn(O, O) -> O>(
+    iter: I,
+    m: MF,
+    init: O,
+    f: FF,
+) -> O {
     iter.map(m).fold(init, f)
 }
 
-fn quote_map_fold<T, I: Iterator<Item=T>, MF: Fn(T) -> TokenStream>(iter: I, m: MF) -> TokenStream {
+fn quote_map_fold<T, I: Iterator<Item = T>, MF: Fn(T) -> TokenStream>(
+    iter: I,
+    m: MF,
+) -> TokenStream {
     map_fold(iter, m, quote! {}, |acc, q| {
         quote! {
-                    #acc
-                    #q
-                }
+            #acc
+            #q
+        }
     })
 }
 
@@ -41,7 +49,7 @@ impl CsrPrivilege {
         match self {
             CsrPrivilege::RW(_) => true,
             CsrPrivilege::WO(_) => true,
-            CsrPrivilege::RO(_) => false
+            CsrPrivilege::RO(_) => false,
         }
     }
 
@@ -49,7 +57,7 @@ impl CsrPrivilege {
         match self {
             CsrPrivilege::RW(_) => true,
             CsrPrivilege::WO(_) => false,
-            CsrPrivilege::RO(_) => true
+            CsrPrivilege::RO(_) => true,
         }
     }
 }
@@ -71,6 +79,5 @@ impl Parse for CsrPrivilege {
     }
 }
 
-
-pub mod define_csr;
 pub mod csr_map;
+pub mod define_csr;

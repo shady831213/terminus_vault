@@ -1,9 +1,9 @@
-use syn::parse::{Parse, ParseStream, Result, Error, ParseBuffer};
-use syn::{parenthesized, braced, Ident, Token, LitInt};
-use syn::punctuated::Punctuated;
+use super::*;
 use proc_macro2::TokenStream;
 use std::collections::HashMap;
-use super::*;
+use syn::parse::{Error, Parse, ParseBuffer, ParseStream, Result};
+use syn::punctuated::Punctuated;
+use syn::{braced, parenthesized, Ident, LitInt, Token};
 
 mod attr_kw {
     syn::custom_keyword!(fields);
@@ -16,7 +16,6 @@ struct Csr {
     name: Ident,
     attrs: Punctuated<CsrAttr, Token![,]>,
 }
-
 
 impl Parse for Csr {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -43,7 +42,6 @@ impl<K> Attr<K> {
         Attr { key, attrs }
     }
 }
-
 
 #[derive(Debug)]
 enum CsrAttr {
@@ -89,7 +87,10 @@ struct Field {
 
 impl Field {
     fn range(&self) -> (usize, usize) {
-        (self.msb.base10_parse().unwrap(), self.lsb.base10_parse().unwrap())
+        (
+            self.msb.base10_parse().unwrap(),
+            self.lsb.base10_parse().unwrap(),
+        )
     }
 
     fn same_name(&self, rhs: &Self) -> bool {
@@ -98,7 +99,10 @@ impl Field {
 
     fn overlap(&self, rhs: &Self) -> bool {
         let ((msb, lsb), (rmsb, rlsb)) = (self.range(), rhs.range());
-        msb >= rlsb && msb <= rmsb || lsb >= rlsb && lsb <= rmsb || rmsb >= lsb && rmsb <= msb || rlsb >= lsb && rlsb <= msb
+        msb >= rlsb && msb <= rmsb
+            || lsb >= rlsb && lsb <= rmsb
+            || rmsb >= lsb && rmsb <= msb
+            || rlsb >= lsb && rlsb <= msb
     }
 
     fn setter_name(&self) -> Ident {
@@ -123,7 +127,14 @@ impl Parse for Field {
         let lsb: LitInt = input.parse()?;
 
         if msb.base10_parse::<usize>()? < lsb.base10_parse::<usize>()? {
-            return Err(Error::new(msb.span(), format!("msb {} is smaller than lsb {} !", msb.to_string(), lsb.to_string())));
+            return Err(Error::new(
+                msb.span(),
+                format!(
+                    "msb {} is smaller than lsb {} !",
+                    msb.to_string(),
+                    lsb.to_string()
+                ),
+            ));
         }
 
         Ok(Field {
@@ -157,14 +168,33 @@ impl<'a> Fields<'a> {
 
     fn add(&mut self, field: &'a Field) -> Result<()> {
         if self.overflow(field) {
-            Err(Error::new(field.name.span(), format!("field {}{:?} overflow!", field.name.to_string(), field.range())))
+            Err(Error::new(
+                field.name.span(),
+                format!(
+                    "field {}{:?} overflow!",
+                    field.name.to_string(),
+                    field.range()
+                ),
+            ))
         } else {
             for prev in self.fields.iter() {
                 if field.same_name(prev) {
-                    return Err(Error::new(field.name.span(), format!("field {} is redefined!", field.name.to_string())));
+                    return Err(Error::new(
+                        field.name.span(),
+                        format!("field {} is redefined!", field.name.to_string()),
+                    ));
                 }
                 if field.overlap(prev) {
-                    return Err(Error::new(field.name.span(), format!("field {}{:?} is overlapped with field {}{:?}!", field.name.to_string(), field.range(), prev.name.to_string(), prev.range())));
+                    return Err(Error::new(
+                        field.name.span(),
+                        format!(
+                            "field {}{:?} is overlapped with field {}{:?}!",
+                            field.name.to_string(),
+                            field.range(),
+                            prev.name.to_string(),
+                            prev.range()
+                        ),
+                    ));
                 }
             }
             Ok(self.fields.push(field))
@@ -185,7 +215,7 @@ impl<'a> Fields<'a> {
     }
 
     fn struct_name(&self) -> Ident {
-        format_ident!("{}{}", self.name.to_string(),self.size)
+        format_ident!("{}{}", self.name.to_string(), self.size)
     }
 
     fn struct_expand(&self, trait_name: &Ident, transforms_name: &Ident) -> TokenStream {
@@ -195,15 +225,21 @@ impl<'a> Fields<'a> {
             let (setter, getter) = (field.setter_name(), field.getter_name());
             let (msb, lsb) = (&field.msb, &field.lsb);
             quote! {
-                    #[inline(always)]
-                    #getter, #setter: #msb, #lsb;
-                }
+                #[inline(always)]
+                #getter, #setter: #msb, #lsb;
+            }
         });
 
         let fns = quote_map_fold(self.fields.iter(), |field| {
             let (setter, getter) = (field.setter_name(), field.getter_name());
-            let (setter_with_trans, getter_with_trans) = (format_ident!("{}_with_trans", field.setter_name()), format_ident!("{}_with_trans",field.getter_name()));
-            let (setter_transform, getter_transform) = (format_ident!("{}_transform", field.setter_name()), format_ident!("{}_transform",field.getter_name()));
+            let (setter_with_trans, getter_with_trans) = (
+                format_ident!("{}_with_trans", field.setter_name()),
+                format_ident!("{}_with_trans", field.getter_name()),
+            );
+            let (setter_transform, getter_transform) = (
+                format_ident!("{}_transform", field.setter_name()),
+                format_ident!("{}_transform", field.getter_name()),
+            );
             quote! {
                 fn #getter_with_trans(&self, t:&#transforms_name) -> u64 {
                     let value = self.#getter();
@@ -224,15 +260,22 @@ impl<'a> Fields<'a> {
             }
         });
 
-        let set = quote_map_fold(self.fields.iter().filter(|field| { field.privilege.writeable() }), |field| {
-            let lsb = &field.lsb;
-            let setter_with_trans = format_ident!("{}_with_trans", field.setter_name());
-            quote! {
-                self.#setter_with_trans(value >> (#lsb as u64), t);
-            }
-        });
-        let get = self.fields.iter()
-            .filter(|field| { field.privilege.readable() })
+        let set = quote_map_fold(
+            self.fields
+                .iter()
+                .filter(|field| field.privilege.writeable()),
+            |field| {
+                let lsb = &field.lsb;
+                let setter_with_trans = format_ident!("{}_with_trans", field.setter_name());
+                quote! {
+                    self.#setter_with_trans(value >> (#lsb as u64), t);
+                }
+            },
+        );
+        let get = self
+            .fields
+            .iter()
+            .filter(|field| field.privilege.readable())
             .map(|field| {
                 let lsb = &field.lsb;
                 let getter_with_trans = format_ident!("{}_with_trans", field.getter_name());
@@ -299,7 +342,10 @@ struct FieldSet<'a> {
 
 impl<'a> FieldSet<'a> {
     fn new(name: Ident) -> Self {
-        FieldSet { name, field_names: HashMap::new() }
+        FieldSet {
+            name,
+            field_names: HashMap::new(),
+        }
     }
 
     fn add(&mut self, field: &'a Field) {
@@ -310,7 +356,6 @@ impl<'a> FieldSet<'a> {
         format_ident!("{}Trait", self.name.to_string())
     }
 
-
     fn transforms_name(&self) -> Ident {
         format_ident!("{}Transforms", self.name.to_string())
     }
@@ -319,9 +364,20 @@ impl<'a> FieldSet<'a> {
         let transforms_name = self.transforms_name();
         let fns = quote_map_fold(self.field_names.values(), |field| {
             let (setter, getter) = (field.setter_name(), field.getter_name());
-            let (setter_with_trans, getter_with_trans) = (format_ident!("{}_with_trans", field.setter_name()), format_ident!("{}_with_trans",field.getter_name()));
-            let getter_msg = format!("{} not implement {} in current xlen setting!", self.name.to_string(), getter.to_string());
-            let setter_msg = format!("{} not implement {} in current xlen setting!", self.name.to_string(), setter.to_string());
+            let (setter_with_trans, getter_with_trans) = (
+                format_ident!("{}_with_trans", field.setter_name()),
+                format_ident!("{}_with_trans", field.getter_name()),
+            );
+            let getter_msg = format!(
+                "{} not implement {} in current xlen setting!",
+                self.name.to_string(),
+                getter.to_string()
+            );
+            let setter_msg = format!(
+                "{} not implement {} in current xlen setting!",
+                self.name.to_string(),
+                setter.to_string()
+            );
             quote! {
                 fn #getter_with_trans(&self, t:&#transforms_name) -> u64 { panic!(#getter_msg)}
                 fn #setter_with_trans(&mut self, value:u64, t:&#transforms_name) { panic!(#setter_msg)}
@@ -338,7 +394,10 @@ impl<'a> FieldSet<'a> {
     fn transforms_expand(&self) -> TokenStream {
         let transforms_name = self.transforms_name();
         let transforms = quote_map_fold(self.field_names.values(), |field| {
-            let (setter_transform, getter_transform) = (format_ident!("{}_transform", field.setter_name()), format_ident!("{}_transform",field.getter_name()));
+            let (setter_transform, getter_transform) = (
+                format_ident!("{}_transform", field.setter_name()),
+                format_ident!("{}_transform", field.getter_name()),
+            );
             quote! {
                 #getter_transform:Option<Box<dyn Fn(u64)->u64>>,
                 #setter_transform:Option<Box<dyn Fn(u64)->u64>>,
@@ -346,7 +405,10 @@ impl<'a> FieldSet<'a> {
         });
 
         let transform_inits = quote_map_fold(self.field_names.values(), |field| {
-            let (setter_transform, getter_transform) = (format_ident!("{}_transform", field.setter_name()), format_ident!("{}_transform",field.getter_name()));
+            let (setter_transform, getter_transform) = (
+                format_ident!("{}_transform", field.setter_name()),
+                format_ident!("{}_transform", field.getter_name()),
+            );
             quote! {
                 #getter_transform:None,
                 #setter_transform:None,
@@ -354,7 +416,10 @@ impl<'a> FieldSet<'a> {
         });
 
         let transform_fns = quote_map_fold(self.field_names.values(), |field| {
-            let (setter_transform, getter_transform) = (format_ident!("{}_transform", field.setter_name()), format_ident!("{}_transform",field.getter_name()));
+            let (setter_transform, getter_transform) = (
+                format_ident!("{}_transform", field.setter_name()),
+                format_ident!("{}_transform", field.getter_name()),
+            );
             quote! {
                 pub fn #setter_transform<F:Fn(u64)->u64 +'static>(&mut self, f:F) {
                     self.#setter_transform = Some(Box::new(f))
@@ -392,7 +457,10 @@ impl<'a> FieldSet<'a> {
         let top_name = &self.name;
         let transforms_name = self.transforms_name();
         let transform_fns = quote_map_fold(self.field_names.values(), |field| {
-            let (setter_transform, getter_transform) = (format_ident!("{}_transform", field.setter_name()), format_ident!("{}_transform",field.getter_name()));
+            let (setter_transform, getter_transform) = (
+                format_ident!("{}_transform", field.setter_name()),
+                format_ident!("{}_transform", field.getter_name()),
+            );
             quote! {
                 pub fn #setter_transform<F:Fn(u64)->u64 +'static>(&mut self, f:F) {
                     self.transforms.#setter_transform(f)
@@ -404,7 +472,10 @@ impl<'a> FieldSet<'a> {
         });
         let fns = quote_map_fold(self.field_names.values(), |field| {
             let (setter, getter) = (field.setter_name(), field.getter_name());
-            let (setter_with_trans, getter_with_trans) = (format_ident!("{}_with_trans", field.setter_name()), format_ident!("{}_with_trans",field.getter_name()));
+            let (setter_with_trans, getter_with_trans) = (
+                format_ident!("{}_with_trans", field.setter_name()),
+                format_ident!("{}_with_trans", field.getter_name()),
+            );
             quote! {
                 pub fn #getter(&self) -> u64 {
                     match self.xlen {
@@ -491,25 +562,23 @@ impl<'a> FieldSet<'a> {
     }
 }
 
-
 macro_rules! get_attr {
     ($attrs: expr, $exp: path) => {
         || {
-            let _attr = $attrs.iter().filter_map(|f| {
-                if let $exp(a) = f {
-                    Some(a)
-                } else {
-                    None
-                }
-            }).collect::<Vec<_>>();
+            let _attr = $attrs
+                .iter()
+                .filter_map(|f| if let $exp(a) = f { Some(a) } else { None })
+                .collect::<Vec<_>>();
             if _attr.len() == 0 {
                 Ok(None)
             } else if _attr.len() == 1 {
                 Ok(Some(_attr[0]))
             } else {
-                Err(Error::new(_attr[1].key.span, format!("{:?} is redefined!", _attr[1].key)))
+                Err(Error::new(
+                    _attr[1].key.span,
+                    format!("{:?} is redefined!", _attr[1].key),
+                ))
             }
-
         }
     };
 }
@@ -570,7 +639,3 @@ pub fn expand(input: TokenStream) -> TokenStream {
         #top_target
     }
 }
-
-
-
-

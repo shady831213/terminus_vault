@@ -16,7 +16,7 @@ macro_rules! init_simplemap {
             }
 
             fn decode(&self, ir: &$inst) -> Result<&Instruction, Error> {
-                let decoder = self.0.values().find(|d| { d.matched(ir) });
+                let decoder = self.0.values().find(|d| d.matched(ir));
                 if let Some(d) = decoder {
                     Ok(d.decode())
                 } else {
