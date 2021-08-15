@@ -79,8 +79,8 @@ pub fn expand(ast: &DeriveInput, name: &Ident) -> Result<proc_macro2::TokenStrea
 fn check_fields(data: &DataStruct, name: &Ident) -> Result<()> {
     let msg = format!("expect \'struct {}();\' !", name.to_string());
     if let syn::Fields::Unnamed(ref field) = data.fields {
-        if field.unnamed.len() != 0 {
-            return Err(Error::new(field.paren_token.span, msg));
+        if !field.unnamed.is_empty() {
+            Err(Error::new(field.paren_token.span, msg))
         } else {
             Ok(())
         }
@@ -128,10 +128,10 @@ fn parse_raw_bits(lit: &LitStr) -> Result<String> {
             Ok(bits.to_string())
         }
     } else {
-        return Err(Error::new(
+        Err(Error::new(
             lit.span(),
             "code contains invalid char, valid format is ^[0-9]+b[1|0|?|_]+!",
-        ));
+        ))
     }
 }
 

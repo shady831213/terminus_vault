@@ -127,7 +127,7 @@ macro_rules! init_treemap {
                 let code = decoder.code();
                 let mask = decoder.mask();
                 if let Some(v) = self.0.insert(Box::new(decoder)) {
-                    __terminus_insn_panic!(__terminus_insn_format!("inst {}(code = {:#x}; mask = {:#x}) is duplicated with inst {}(code = {:#x}; mask = {:#x})!", name, code, mask,v.name(), v.code(), v.mask()))
+                    __terminus_insn_panic!("inst {}(code = {:#x}; mask = {:#x}) is duplicated with inst {}(code = {:#x}; mask = {:#x})!", name, code, mask,v.name(), v.code(), v.mask())
                 }
             }
 
