@@ -54,7 +54,7 @@ struct CsrMap {
 
 impl CsrMap {
     fn same_name(&self, rhs: &Self) -> bool {
-        self.name.to_string() == rhs.name.to_string()
+        rhs.name == self.name
     }
 
     fn addr_value(&self) -> u64 {
@@ -140,7 +140,8 @@ impl<'a> Maps<'a> {
                     ));
                 }
             }
-            Ok(self.maps.push(csr_map))
+            self.maps.push(csr_map);
+            Ok(())
         }
     }
 
@@ -252,7 +253,7 @@ impl<'a> Maps<'a> {
                 #fields_access
                 pub fn new(xlen:usize)->#struct_name {
                     if xlen != 32 && xlen !=64 {
-                        panic!(format!("xlen only support 32 or 64, but get {}", xlen));
+                        panic!("xlen only support 32 or 64, but get {}", xlen);
                     }
                     #struct_name{
                     xlen,

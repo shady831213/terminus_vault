@@ -23,7 +23,7 @@ impl Parse for Csr {
         let content: ParseBuffer;
         braced!(content in input);
         Ok(Csr {
-            name: name,
+            name,
             attrs: content.parse_terminated(CsrAttr::parse)?,
         })
     }
@@ -94,7 +94,7 @@ impl Field {
     }
 
     fn same_name(&self, rhs: &Self) -> bool {
-        self.name.to_string() == rhs.name.to_string()
+        rhs.name == self.name
     }
 
     fn overlap(&self, rhs: &Self) -> bool {
@@ -156,7 +156,7 @@ impl<'a> Fields<'a> {
     fn new(name: Ident, size: usize) -> Self {
         Fields {
             name,
-            size: size,
+            size,
             fields: vec![],
         }
     }
@@ -197,7 +197,8 @@ impl<'a> Fields<'a> {
                     ));
                 }
             }
-            Ok(self.fields.push(field))
+            self.fields.push(field);
+            Ok(())
         }
     }
 
