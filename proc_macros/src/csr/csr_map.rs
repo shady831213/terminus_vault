@@ -146,9 +146,17 @@ impl<'a> Maps<'a> {
     }
 
     fn expand(&self, name: &Ident, vis: &Visibility, locked: bool) -> TokenStream {
+        let ty_trans = |csr_map: &CsrMap| {
+            let ident = csr_map.ty.get_ident().unwrap();
+            if locked {
+                format_ident!("Locked{}", ident.to_string())
+            } else {
+                format_ident!("{}", ident.to_string())
+            }
+        };
         let fields = quote_map_fold(self.maps.iter(), |csr_map| {
             let name = &csr_map.name;
-            let ty = &csr_map.ty;
+            let ty = ty_trans(&csr_map);
             if locked {
                 quote! {#name:std::sync::Mutex<#ty>,}
             } else {
@@ -157,7 +165,7 @@ impl<'a> Maps<'a> {
         });
         let fields_access = quote_map_fold(self.maps.iter(), |csr_map| {
             let name = &csr_map.name;
-            let ty = &csr_map.ty;
+            let ty = ty_trans(&csr_map);
             let mut_name = format_ident!("{}_mut", name);
             let immut_access = if locked {
                 quote! {
@@ -192,7 +200,7 @@ impl<'a> Maps<'a> {
         });
         let new_fn = quote_map_fold(self.maps.iter(), |csr_map| {
             let name = &csr_map.name;
-            let ty = &csr_map.ty;
+            let ty = ty_trans(&csr_map);
             if locked {
                 quote! {#name:std::sync::Mutex::new(#ty::new(xlen, 0)),}
             } else {

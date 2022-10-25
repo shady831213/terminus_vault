@@ -215,11 +215,20 @@ impl<'a> Fields<'a> {
         self.fields.is_empty()
     }
 
-    fn struct_name(&self) -> Ident {
-        format_ident!("{}{}", self.name.to_string(), self.size)
+    fn struct_name(&self, locked: bool) -> Ident {
+        if locked {
+            format_ident!("Locked{}{}", self.name.to_string(), self.size)
+        } else {
+            format_ident!("{}{}", self.name.to_string(), self.size)
+        }
     }
 
-    fn struct_expand(&self, trait_name: &Ident, transforms_name: &Ident) -> TokenStream {
+    fn struct_expand(
+        &self,
+        trait_name: &Ident,
+        transforms_name: &Ident,
+        locked: bool,
+    ) -> TokenStream {
         let size = format_ident!("u{}", self.size);
 
         let fields = quote_map_fold(self.fields.iter(), |field| {
@@ -289,7 +298,7 @@ impl<'a> Fields<'a> {
                     #acc | #q
                 }
             });
-        let struct_name = self.struct_name();
+        let struct_name = self.struct_name(locked);
         quote! {
             #[derive(Copy, Clone)]
             struct #struct_name(#size);
@@ -353,16 +362,24 @@ impl<'a> FieldSet<'a> {
         self.field_names.insert(field.name.to_string(), field);
     }
 
-    fn trait_name(&self) -> Ident {
-        format_ident!("{}Trait", self.name.to_string())
+    fn trait_name(&self, locked: bool) -> Ident {
+        if locked {
+            format_ident!("Locked{}Trait", self.name.to_string())
+        } else {
+            format_ident!("{}Trait", self.name.to_string())
+        }
     }
 
-    fn transforms_name(&self) -> Ident {
-        format_ident!("{}Transforms", self.name.to_string())
+    fn transforms_name(&self, locked: bool) -> Ident {
+        if locked {
+            format_ident!("Locked{}Transforms", self.name.to_string())
+        } else {
+            format_ident!("{}Transforms", self.name.to_string())
+        }
     }
 
-    fn trait_expand(&self) -> TokenStream {
-        let transforms_name = self.transforms_name();
+    fn trait_expand(&self, locked: bool) -> TokenStream {
+        let transforms_name = self.transforms_name(locked);
         let fns = quote_map_fold(self.field_names.values(), |field| {
             let (setter, getter) = (field.setter_name(), field.getter_name());
             let (setter_with_trans, getter_with_trans) = (
@@ -384,7 +401,7 @@ impl<'a> FieldSet<'a> {
                 fn #setter_with_trans(&mut self, value:u64, t:&#transforms_name) { panic!(#setter_msg)}
             }
         });
-        let trait_name = self.trait_name();
+        let trait_name = self.trait_name(locked);
         quote! {
             trait #trait_name {
                 #fns
@@ -392,16 +409,23 @@ impl<'a> FieldSet<'a> {
         }
     }
 
-    fn transforms_expand(&self) -> TokenStream {
-        let transforms_name = self.transforms_name();
+    fn transforms_expand(&self, locked: bool) -> TokenStream {
+        let transforms_name = self.transforms_name(locked);
         let transforms = quote_map_fold(self.field_names.values(), |field| {
             let (setter_transform, getter_transform) = (
                 format_ident!("{}_transform", field.setter_name()),
                 format_ident!("{}_transform", field.getter_name()),
             );
-            quote! {
-                #getter_transform:Option<Box<dyn Fn(u64)->u64>>,
-                #setter_transform:Option<Box<dyn Fn(u64)->u64>>,
+            if locked {
+                quote! {
+                    #getter_transform:Option<Box<dyn Fn(u64)->u64 + Send>>,
+                    #setter_transform:Option<Box<dyn Fn(u64)->u64 + Send>>,
+                }
+            } else {
+                quote! {
+                    #getter_transform:Option<Box<dyn Fn(u64)->u64>>,
+                    #setter_transform:Option<Box<dyn Fn(u64)->u64>>,
+                }
             }
         });
 
@@ -421,12 +445,23 @@ impl<'a> FieldSet<'a> {
                 format_ident!("{}_transform", field.setter_name()),
                 format_ident!("{}_transform", field.getter_name()),
             );
-            quote! {
-                pub fn #setter_transform<F:Fn(u64)->u64 +'static>(&mut self, f:F) {
-                    self.#setter_transform = Some(Box::new(f))
+            if locked {
+                quote! {
+                    pub fn #setter_transform<F:Fn(u64)->u64 + Send +'static>(&mut self, f:F) {
+                        self.#setter_transform = Some(Box::new(f))
+                    }
+                    pub fn #getter_transform<F:Fn(u64)->u64 + Send +'static>(&mut self, f:F) {
+                        self.#getter_transform = Some(Box::new(f))
+                    }
                 }
-                pub fn #getter_transform<F:Fn(u64)->u64 +'static>(&mut self, f:F) {
-                    self.#getter_transform = Some(Box::new(f))
+            } else {
+                quote! {
+                    pub fn #setter_transform<F:Fn(u64)->u64 +'static>(&mut self, f:F) {
+                        self.#setter_transform = Some(Box::new(f))
+                    }
+                    pub fn #getter_transform<F:Fn(u64)->u64 +'static>(&mut self, f:F) {
+                        self.#getter_transform = Some(Box::new(f))
+                    }
                 }
             }
         });
@@ -446,8 +481,17 @@ impl<'a> FieldSet<'a> {
         }
     }
 
-    fn top_expand(&self, struct32_name: &Ident, struct64_name: &Ident) -> TokenStream {
-        let union_name = format_ident!("{}Union", self.name.to_string());
+    fn top_expand(
+        &self,
+        struct32_name: &Ident,
+        struct64_name: &Ident,
+        locked: bool,
+    ) -> TokenStream {
+        let union_name = if locked {
+            format_ident!("Locked{}Union", self.name.to_string())
+        } else {
+            format_ident!("{}Union", self.name.to_string())
+        };
         let union_target = quote! {
             union #union_name {
                 x32: #struct32_name,
@@ -455,19 +499,34 @@ impl<'a> FieldSet<'a> {
             }
         };
 
-        let top_name = &self.name;
-        let transforms_name = self.transforms_name();
+        let top_name = if locked {
+            format_ident!("Locked{}", self.name.to_string())
+        } else {
+            format_ident!("{}", self.name.to_string())
+        };
+        let transforms_name = self.transforms_name(locked);
         let transform_fns = quote_map_fold(self.field_names.values(), |field| {
             let (setter_transform, getter_transform) = (
                 format_ident!("{}_transform", field.setter_name()),
                 format_ident!("{}_transform", field.getter_name()),
             );
-            quote! {
-                pub fn #setter_transform<F:Fn(u64)->u64 +'static>(&mut self, f:F) {
-                    self.transforms.#setter_transform(f)
+            if locked {
+                quote! {
+                    pub fn #setter_transform<F:Fn(u64)->u64  + Send +'static>(&mut self, f:F) {
+                        self.transforms.#setter_transform(f)
+                    }
+                    pub fn #getter_transform<F:Fn(u64)->u64  + Send +'static>(&mut self, f:F) {
+                        self.transforms.#getter_transform(f)
+                    }
                 }
-                pub fn #getter_transform<F:Fn(u64)->u64 +'static>(&mut self, f:F) {
-                    self.transforms.#getter_transform(f)
+            } else {
+                quote! {
+                    pub fn #setter_transform<F:Fn(u64)->u64 +'static>(&mut self, f:F) {
+                        self.transforms.#setter_transform(f)
+                    }
+                    pub fn #getter_transform<F:Fn(u64)->u64 +'static>(&mut self, f:F) {
+                        self.transforms.#getter_transform(f)
+                    }
                 }
             }
         });
@@ -624,13 +683,31 @@ pub fn expand(input: TokenStream) -> TokenStream {
         field_set.add(&defalut_field64);
     }
 
-    let trait_name = field_set.trait_name();
-    let trait_target = field_set.trait_expand();
-    let transforms_name = field_set.transforms_name();
-    let transforms_target = field_set.transforms_expand();
-    let struct32_target = field32s.struct_expand(&trait_name, &transforms_name);
-    let struct64_target = field64s.struct_expand(&trait_name, &transforms_name);
-    let top_target = field_set.top_expand(&field32s.struct_name(), &field64s.struct_name());
+    let locked_trait_name = field_set.trait_name(true);
+    let locked_trait_target = field_set.trait_expand(true);
+    let locked_transforms_name = field_set.transforms_name(true);
+    let locked_transforms_target = field_set.transforms_expand(true);
+    let locked_struct32_target =
+        field32s.struct_expand(&locked_trait_name, &locked_transforms_name, true);
+    let locked_struct64_target =
+        field64s.struct_expand(&locked_trait_name, &locked_transforms_name, true);
+    let locked_top_target = field_set.top_expand(
+        &field32s.struct_name(true),
+        &field64s.struct_name(true),
+        true,
+    );
+
+    let trait_name = field_set.trait_name(false);
+    let trait_target = field_set.trait_expand(false);
+    let transforms_name = field_set.transforms_name(false);
+    let transforms_target = field_set.transforms_expand(false);
+    let struct32_target = field32s.struct_expand(&trait_name, &transforms_name, false);
+    let struct64_target = field64s.struct_expand(&trait_name, &transforms_name, false);
+    let top_target = field_set.top_expand(
+        &field32s.struct_name(false),
+        &field64s.struct_name(false),
+        false,
+    );
 
     quote! {
         #trait_target
@@ -638,5 +715,11 @@ pub fn expand(input: TokenStream) -> TokenStream {
         #struct32_target
         #struct64_target
         #top_target
+
+        #locked_trait_target
+        #locked_transforms_target
+        #locked_struct32_target
+        #locked_struct64_target
+        #locked_top_target
     }
 }
